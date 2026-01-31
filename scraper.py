@@ -3,61 +3,50 @@ from playwright_stealth import Stealth
 
 async def get_order_details(order_id):
     async with async_playwright() as p:
-        # Launch browser
-        browser = await p.chromium.launch(headless=True)
-        # Load your saved TCGplayer session
+        # Optimized for e2-micro (Low RAM)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"]
+        )
         context = await browser.new_context(storage_state="tcg_state.json")
         page = await context.new_page()
-        
-        # Apply Stealth
-        stealth = Stealth()
-        await stealth.apply_stealth_async(page)
+        page.set_default_timeout(120000)
+        await Stealth().apply_stealth_async(page)
 
-        print(f"🔍 Scraping Order: {order_id}...")
-        await page.goto(f"https://sellerportal.tcgplayer.com/orders/{order_id}")
-        await page.wait_for_load_state("networkidle")
-
+        print(f"🔍 Scraping Order: {order_id}...", flush=True)
         try:
-            # 1. Extract Buyer Name
+            await page.goto(f"https://sellerportal.tcgplayer.com/orders/{order_id}", wait_until="domcontentloaded")
+            await page.wait_for_selector("tbody tr", state="attached", timeout=60000)
+
+            # Extract Buyer
             buyer_locator = page.locator("div:has-text('Buyer')").locator("strong").first
             buyer_name = await buyer_locator.inner_text()
-            
-            # 2. Extract Product Details (Name, Qty, Price)
+
+            # Extract Items
             items = []
-            # Filter for table rows that contain product links
             product_rows = page.locator("tbody tr").filter(has=page.locator("a[href*='product']"))
-            
-            all_rows = await product_rows.all()
-            for row in all_rows:
-                # Get all table cells in this specific row
+            count = await product_rows.count()
+            for i in range(count):
+                row = product_rows.nth(i)
                 cells = row.locator("td")
-                cell_count = await cells.count()
-                
-                # Standard TCGplayer rows have 4-5 cells. 
-                # Hidden/Mobile rows usually have fewer or are empty.
-                if cell_count >= 4:
+                if await cells.count() >= 4:
                     name = await cells.nth(0).inner_text()
                     qty = await cells.nth(2).inner_text()
                     price = await cells.nth(3).inner_text()
-                    
-                    # Prevent adding empty or "Ghost" rows
-                    if name.strip():
-                        items.append({
-                            "name": name.strip(), 
-                            "qty": qty.strip(), 
-                            "price": price.strip()
-                        })
-                        
-            unique_items = []
-            seen_names = set()
-            for item in items:
-                if item['name'] not in seen_names:
-                    unique_items.append(item)
-                    seen_names.add(item['name'])
+                    items.append({"name": name.strip(), "qty": qty.strip(), "price": price.strip()})
 
+            # Deduplicate
+            unique_items = []
+            seen = set()
+            for item in items:
+                if item['name'] not in seen:
+                    unique_items.append(item)
+                    seen.add(item['name'])
+
+            print(f"✨ Scraper finished extracting {len(unique_items)} items.", flush=True)
             return {"buyer": buyer_name.strip(), "items": unique_items}
         except Exception as e:
-            print(f"❌ Scraper failed for {order_id}: {e}")
+            print(f"❌ Scraper Error: {e}", flush=True)
             return None
         finally:
             await browser.close()

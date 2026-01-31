@@ -8,21 +8,19 @@ def save_tcg_auth():
         context = browser.new_context()
         page = context.new_page()
         
-        # Apply the 2026 Stealth logic
         stealth = Stealth()
         stealth.apply_stealth_sync(page)
 
-        print("🚀 Opening TCGplayer login...")
+        print("opening TCGplayer login...")
         page.goto("https://sellerportal.tcgplayer.com/login")
 
         print("\n--- ACTION REQUIRED ---")
         print("1. Log in manually in the browser window.")
-        print("2. Once you see your Dashboard/Home page...")
-        input("3. Come back HERE and press ENTER to save your session...") 
+        print("2. Once you see your Dashboard/Home page.")
+        input("3. Press ENTER to save your session.") 
 
-        # Once you press Enter, it captures the current cookies
         context.storage_state(path="tcg_state.json")
-        print("\n✅ Success! 'tcg_state.json' has been created.")
+        print("\n'tcg_state.json' has been created with the correct credentials.")
         browser.close()
 
 if __name__ == "__main__":
