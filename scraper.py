@@ -37,19 +37,26 @@ async def get_order_details(order_id):
 
             # Deduplicate
             unique_items = []
-            seen = set()
-            for item in items:
-                # Normalize: removes all newlines and collapses multiple spaces into one
-                normalized_name = " ".join(item['name'].split())
-                if normalized_name not in seen:
-                    item['name'] = normalized_name # Update the item with the clean name
-                    unique_items.append(item)
-                    seen.add(normalized_name)
+            seen_fingerprints = set()
 
-            print(f"Scraper finished extracting {len(unique_items)} items.", flush=True)
+            for item in items:
+                # 1. Clean up the name for the Discord display (collapse spaces/newlines)
+                display_name = " ".join(item['name'].split())
+                
+                fingerprint = "".join(item['name'].split()).lower()
+                
+                # Add price and qty to the fingerprint to ensure different items aren't merged
+                full_fingerprint = f"{item['qty']}-{fingerprint}-{item['price']}"
+
+                if full_fingerprint not in seen_fingerprints:
+                    item['name'] = display_name # Save the pretty version
+                    unique_items.append(item)
+                    seen_fingerprints.add(full_fingerprint)
+
+            print(f"Scraper finished extracting {len(unique_items)} unique items.", flush=True)
             return {"buyer": buyer_name.strip(), "items": unique_items}
         except Exception as e:
-            print(f"❌ Scraper Error: {e}", flush=True)
+            print(f"Scraper Error: {e}", flush=True)
             return None
         finally:
             await browser.close()
