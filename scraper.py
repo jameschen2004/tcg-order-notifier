@@ -39,11 +39,14 @@ async def get_order_details(order_id):
             unique_items = []
             seen = set()
             for item in items:
-                if item['name'] not in seen:
+                # Normalize: removes all newlines and collapses multiple spaces into one
+                normalized_name = " ".join(item['name'].split())
+                if normalized_name not in seen:
+                    item['name'] = normalized_name # Update the item with the clean name
                     unique_items.append(item)
-                    seen.add(item['name'])
+                    seen.add(normalized_name)
 
-            print(f"✨ Scraper finished extracting {len(unique_items)} items.", flush=True)
+            print(f"Scraper finished extracting {len(unique_items)} items.", flush=True)
             return {"buyer": buyer_name.strip(), "items": unique_items}
         except Exception as e:
             print(f"❌ Scraper Error: {e}", flush=True)

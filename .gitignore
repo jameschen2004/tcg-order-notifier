@@ -210,4 +210,6 @@ credentials.json
 token.json
 tcg_state.json
 
+orders.db
+
 *.png
